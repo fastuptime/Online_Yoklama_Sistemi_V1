@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Öğretim Görevlisi Paneli - Online Yoklama Sistemi</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <nav class="bg-blue-600 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <h1 class="text-xl font-bold">Online Yoklama Sistemi</h1>
+      <div class="flex items-center space-x-4">
+        <span id="userFullName" class="hidden md:inline"></span>
+        <a href="/auth/logout" class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600">Çıkış</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+      
+      <div class="md:col-span-1">
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 class="text-lg font-semibold mb-4">Dersler</h2>
+          <div id="coursesList" class="space-y-2">
+            <p class="text-gray-500 text-sm">Yükleniyor...</p>
+          </div>
+          <button id="newCourseBtn" class="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 w-full">
+            Yeni Ders Ekle
+          </button>
+        </div>
+      </div>
+
+      
+      <div class="md:col-span-2">
+        
+        <div id="courseDetails" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+          <h2 id="courseName" class="text-2xl font-bold mb-2"></h2>
+          <p id="courseCode" class="text-gray-600 mb-4"></p>
+
+          <div class="flex flex-wrap gap-2 mb-6">
+            <button id="openAttendanceBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              Yoklama Aç
+            </button>
+            <button id="viewReportsBtn" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
+              Raporlar
+            </button>
+          </div>
+
+          <div id="activeAttendance" class="border-t pt-4 hidden">
+            <h3 class="text-xl font-semibold mb-2">Aktif Yoklama</h3>
+            <p id="attendanceTime" class="text-sm text-gray-600 mb-4"></p>
+
+            <div class="mb-4">
+              <h4 class="font-medium mb-2">Katılan Öğrenciler</h4>
+              <div id="attendingStudentsList" class="max-h-60 overflow-y-auto border rounded-md p-2">
+                <p class="text-gray-500 text-sm">Henüz katılan öğrenci yok</p>
+              </div>
+            </div>
+
+            <button id="closeAttendanceBtn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+              Yoklamayı Kapat
+            </button>
+          </div>
+
+          <div id="attendanceHistory" class="border-t pt-4">
+            <h3 class="text-xl font-semibold mb-2">Geçmiş Yoklamalar</h3>
+            <div id="attendanceList" class="space-y-2">
+              <p class="text-gray-500 text-sm">Yükleniyor...</p>
+            </div>
+          </div>
+        </div>
+
+        
+        <div id="welcomeMessage" class="bg-white rounded-lg shadow-md p-6">
+          <h2 class="text-xl font-semibold mb-4">Hoş Geldiniz</h2>
+          <p class="text-gray-600">Sol taraftan bir ders seçerek yoklama işlemlerine başlayabilirsiniz.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  
+  <div id="newCourseModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+      <h2 class="text-xl font-bold mb-4">Yeni Ders Ekle</h2>
+      <form id="newCourseForm">
+        <div class="mb-4">
+          <label for="courseName" class="block text-sm font-medium text-gray-700 mb-1">Ders Adı</label>
+          <input type="text" id="newCourseName" name="name" required 
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div class="mb-4">
+          <label for="courseCode" class="block text-sm font-medium text-gray-700 mb-1">Ders Kodu</label>
+          <input type="text" id="newCourseCode" name="code" required 
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div class="flex justify-end space-x-2">
+          <button type="button" id="cancelNewCourse" 
+                  class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100">
+            İptal
+          </button>
+          <button type="submit"
+                  class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+            Kaydet
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+
+      const socket = io();
+      let currentCourse = null;
+      let currentAttendanceSession = null;
+
+      const notyf = new Notyf({
+        duration: 3000,
+        position: {
+          x: 'right',
+          y: 'top',
+        }
+      });
+
+      async function loadUserInfo() {
+        try {
+          const response = await fetch('/instructor/profile');
+          if (response.ok) {
+            const user = await response.json();
+            document.getElementById('userFullName').textContent = `${user.name} ${user.surname}`;
+            document.getElementById('userFullName').classList.remove('hidden');
+          }
+        } catch (error) {
+          console.error('Kullanıcı bilgileri yüklenemedi:', error);
+        }
+      }
+
+      async function loadCourses() {
+        try {
+          const response = await fetch('/instructor/courses');
+          if (response.ok) {
+            const courses = await response.json();
+            const coursesList = document.getElementById('coursesList');
+
+            if (courses.length === 0) {
+              coursesList.innerHTML = '<p class="text-gray-500 text-sm">Henüz ders bulunmuyor</p>';
+              return;
+            }
+
+            coursesList.innerHTML = '';
+            courses.forEach(course => {
+              const courseItem = document.createElement('div');
+              courseItem.className = 'p-2 border rounded cursor-pointer hover:bg-blue-50';
+              courseItem.textContent = `${course.name} (${course.code})`;
+              courseItem.addEventListener('click', () => loadCourseDetails(course.id));
+              coursesList.appendChild(courseItem);
+            });
+          }
+        } catch (error) {
+          console.error('Dersler yüklenemedi:', error);
+          notyf.error('Dersler yüklenirken bir hata oluştu.');
+        }
+      }
+
+      async function loadCourseDetails(courseId) {
+        try {
+          const response = await fetch(`/instructor/courses/${courseId}`);
+          if (response.ok) {
+            const course = await response.json();
+            currentCourse = course;
+
+            document.getElementById('courseName').textContent = course.name;
+            document.getElementById('courseCode').textContent = `Ders Kodu: ${course.code}`;
+
+            document.getElementById('welcomeMessage').classList.add('hidden');
+            document.getElementById('courseDetails').classList.remove('hidden');
+
+            const activeSession = course.attendanceSessions.find(session => session.isActive);
+            if (activeSession) {
+              showActiveAttendance(activeSession);
+            } else {
+              document.getElementById('activeAttendance').classList.add('hidden');
+            }
+
+            loadAttendanceHistory(course.attendanceSessions);
+          }
+        } catch (error) {
+          console.error('Ders detayları yüklenemedi:', error);
+          notyf.error('Ders detayları yüklenirken bir hata oluştu.');
+        }
+      }
+
+      function showActiveAttendance(session) {
+        currentAttendanceSession = session;
+
+        const startTime = new Date(session.startTime);
+        document.getElementById('attendanceTime').textContent = `Başlangıç: ${startTime.toLocaleString()}`;
+
+        document.getElementById('activeAttendance').classList.remove('hidden');
+
+        socket.emit('join-attendance', session.id);
+
+        loadAttendingStudents(session.id);
+      }
+
+      async function loadAttendingStudents(sessionId) {
+        try {
+          const response = await fetch(`/instructor/attendance/${sessionId}`);
+          if (response.ok) {
+            const sessionData = await response.json();
+            const attendanceList = document.getElementById('attendingStudentsList');
+
+            if (sessionData.attendances.length === 0) {
+              attendanceList.innerHTML = '<p class="text-gray-500 text-sm">Henüz katılan öğrenci yok</p>';
+              return;
+            }
+
+            attendanceList.innerHTML = '';
+            sessionData.attendances.forEach(attendance => {
+              const student = attendance.student;
+              const attendanceTime = new Date(attendance.time).toLocaleTimeString();
+
+              const studentItem = document.createElement('div');
+              studentItem.className = 'flex justify-between items-center p-2 border-b last:border-b-0';
+              studentItem.innerHTML = `
+                <span>${student.name} ${student.surname} (${student.tc})</span>
+                <span class="text-xs text-gray-500">${attendanceTime}</span>
+              `;
+              attendanceList.appendChild(studentItem);
+            });
+          }
+        } catch (error) {
+          console.error('Katılan öğrenciler yüklenemedi:', error);
+        }
+      }
+
+      function loadAttendanceHistory(sessions) {
+        const attendanceList = document.getElementById('attendanceList');
+        const pastSessions = sessions.filter(s => !s.isActive);
+
+        if (pastSessions.length === 0) {
+          attendanceList.innerHTML = '<p class="text-gray-500 text-sm">Geçmiş yoklama bulunmuyor</p>';
+          return;
+        }
+
+        attendanceList.innerHTML = '';
+        pastSessions.forEach(session => {
+          const startTime = new Date(session.startTime);
+          const endTime = session.endTime ? new Date(session.endTime) : null;
+
+          const sessionItem = document.createElement('div');
+          sessionItem.className = 'p-3 border rounded mb-2';
+          sessionItem.innerHTML = `
+            <div class="flex justify-between items-center mb-2">
+              <span class="font-medium">${startTime.toLocaleDateString()}</span>
+              <button class="text-xs text-blue-600 hover:text-blue-800 view-attendance" data-id="${session.id}">
+                Detaylar
+              </button>
+            </div>
+            <div class="text-xs text-gray-600">
+              <div>Başlangıç: ${startTime.toLocaleTimeString()}</div>
+              <div>${endTime ? 'Bitiş: ' + endTime.toLocaleTimeString() : 'Kapatılmadı'}</div>
+            </div>
+          `;
+
+          const reopenBtn = document.createElement('button');
+          reopenBtn.className = 'mt-2 text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700';
+          reopenBtn.textContent = 'Yeniden Aç';
+          reopenBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            reopenAttendance(session.id);
+          });
+          sessionItem.appendChild(reopenBtn);
+
+          sessionItem.querySelector('.view-attendance').addEventListener('click', () => {
+            viewAttendanceDetails(session.id);
+          });
+
+          attendanceList.appendChild(sessionItem);
+        });
+      }
+
+      document.getElementById('openAttendanceBtn').addEventListener('click', async () => {
+        if (!currentCourse) return;
+
+        try {
+
+          navigator.geolocation.getCurrentPosition(async (position) => {
+            const { latitude, longitude } = position.coords;
+
+            const response = await fetch(`/instructor/courses/${currentCourse.id}/attendance`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ latitude, longitude })
+            });
+
+            if (response.ok) {
+              const session = await response.json();
+              notyf.success('Yoklama başarıyla açıldı');
+              showActiveAttendance(session);
+            } else {
+              const error = await response.json();
+              notyf.error(error.message || 'Yoklama açılırken bir hata oluştu');
+            }
+          }, (error) => {
+            console.error('Konum alınamadı:', error);
+            notyf.error('Konum bilgisi alınamadı. Konum izni verdiğinizden emin olun.');
+          });
+        } catch (error) {
+          console.error('Yoklama açılamadı:', error);
+          notyf.error('Yoklama açılırken bir hata oluştu.');
+        }
+      });
+
+      document.getElementById('closeAttendanceBtn').addEventListener('click', async () => {
+        if (!currentAttendanceSession) return;
+
+        try {
+          const response = await fetch(`/instructor/attendance/${currentAttendanceSession.id}/close`, {
+            method: 'PUT'
+          });
+
+          if (response.ok) {
+            const session = await response.json();
+            notyf.success('Yoklama başarıyla kapatıldı');
+            document.getElementById('activeAttendance').classList.add('hidden');
+            loadCourseDetails(currentCourse.id); 
+          } else {
+            const error = await response.json();
+            notyf.error(error.message || 'Yoklama kapatılırken bir hata oluştu');
+          }
+        } catch (error) {
+          console.error('Yoklama kapatılamadı:', error);
+          notyf.error('Yoklama kapatılırken bir hata oluştu.');
+        }
+      });
+
+      async function reopenAttendance(sessionId) {
+        try {
+          const response = await fetch(`/instructor/attendance/${sessionId}/reopen`, {
+            method: 'PUT'
+          });
+
+          if (response.ok) {
+            notyf.success('Yoklama yeniden açıldı');
+            loadCourseDetails(currentCourse.id); 
+          } else {
+            const error = await response.json();
+            notyf.error(error.message || 'Yoklama yeniden açılırken bir hata oluştu');
+          }
+        } catch (error) {
+          console.error('Yoklama yeniden açılamadı:', error);
+          notyf.error('Yoklama yeniden açılırken bir hata oluştu.');
+        }
+      }
+
+      async function viewAttendanceDetails(sessionId) {
+        try {
+          const response = await fetch(`/instructor/attendance/${sessionId}`);
+          if (response.ok) {
+            const session = await response.json();
+
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+
+            const content = document.createElement('div');
+            content.className = 'bg-white rounded-lg shadow-lg p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto';
+
+            const header = document.createElement('div');
+            header.className = 'flex justify-between items-center mb-4';
+
+            const title = document.createElement('h3');
+            title.className = 'text-xl font-bold';
+            title.textContent = `Yoklama: ${session.course.name}`;
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'text-gray-500 hover:text-gray-700';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.addEventListener('click', () => document.body.removeChild(modal));
+
+            header.appendChild(title);
+            header.appendChild(closeBtn);
+            content.appendChild(header);
+
+            const info = document.createElement('div');
+            info.className = 'mb-4 text-sm text-gray-600';
+
+            const startTime = new Date(session.startTime);
+            const endTime = session.endTime ? new Date(session.endTime) : null;
+
+            info.innerHTML = `
+              <div>Tarih: ${startTime.toLocaleDateString()}</div>
+              <div>Başlangıç: ${startTime.toLocaleTimeString()}</div>
+              ${endTime ? `<div>Bitiş: ${endTime.toLocaleTimeString()}</div>` : ''}
+            `;
+            content.appendChild(info);
+
+            const attendanceList = document.createElement('div');
+            attendanceList.className = 'mt-4';
+
+            const listTitle = document.createElement('h4');
+            listTitle.className = 'font-medium mb-2';
+            listTitle.textContent = 'Katılan Öğrenciler';
+            attendanceList.appendChild(listTitle);
+
+            if (session.attendances.length === 0) {
+              const noStudent = document.createElement('p');
+              noStudent.className = 'text-gray-500 text-sm';
+              noStudent.textContent = 'Katılımcı bulunmuyor';
+              attendanceList.appendChild(noStudent);
+            } else {
+              const list = document.createElement('div');
+              list.className = 'space-y-1';
+
+              session.attendances.forEach(attendance => {
+                const student = attendance.student;
+                const attendanceTime = new Date(attendance.time).toLocaleTimeString();
+
+                const item = document.createElement('div');
+                item.className = 'flex justify-between items-center p-2 border-b last:border-b-0';
+                item.innerHTML = `
+                  <span>${student.name} ${student.surname}</span>
+                  <span class="text-xs text-gray-500">${attendanceTime}</span>
+                `;
+                list.appendChild(item);
+              });
+
+              attendanceList.appendChild(list);
+            }
+
+            content.appendChild(attendanceList);
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+          }
+        } catch (error) {
+          console.error('Yoklama detayları yüklenemedi:', error);
+          notyf.error('Yoklama detayları yüklenirken bir hata oluştu.');
+        }
+      }
+
+      document.getElementById('newCourseBtn').addEventListener('click', () => {
+        document.getElementById('newCourseModal').classList.remove('hidden');
+      });
+
+      document.getElementById('cancelNewCourse').addEventListener('click', () => {
+        document.getElementById('newCourseModal').classList.add('hidden');
+      });
+
+      document.getElementById('newCourseForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const name = document.getElementById('newCourseName').value;
+        const code = document.getElementById('newCourseCode').value;
+
+        try {
+          const response = await fetch('/instructor/courses', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name, code })
+          });
+
+          if (response.ok) {
+            const course = await response.json();
+            notyf.success('Ders başarıyla eklendi');
+            document.getElementById('newCourseModal').classList.add('hidden');
+            document.getElementById('newCourseForm').reset();
+            loadCourses();
+          } else {
+            const error = await response.json();
+            notyf.error(error.message || 'Ders eklenirken bir hata oluştu');
+          }
+        } catch (error) {
+          console.error('Ders eklenemedi:', error);
+          notyf.error('Ders eklenirken bir hata oluştu.');
+        }
+      });
+
+      socket.on('student-marked-attendance', (data) => {
+        if (currentAttendanceSession) {
+          notyf.success(`${data.studentName} yoklamaya katıldı`);
+          loadAttendingStudents(currentAttendanceSession.id);
+        }
+      });
+
+      loadUserInfo();
+      loadCourses();
+    });
+  </script>
+</body>
+</html>

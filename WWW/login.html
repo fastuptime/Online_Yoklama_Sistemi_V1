@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Giriş Yap - Online Yoklama Sistemi</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div class="container mx-auto px-4 py-8">
+    <div class="max-w-md mx-auto bg-white rounded-lg shadow-md overflow-hidden mt-16">
+      <div class="px-6 py-8">
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-8">Giriş Yap</h1>
+        
+        <form id="loginForm" class="space-y-6">
+          <div>
+            <label for="tc" class="block text-sm font-medium text-gray-700">
+              TC Kimlik No
+            </label>
+            <input type="text" id="tc" name="tc" required 
+                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+          </div>
+          
+          <div>
+            <label for="password" class="block text-sm font-medium text-gray-700">
+              Şifre
+            </label>
+            <input type="password" id="password" name="password" required 
+                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+          </div>
+          
+          <div>
+            <button type="submit" 
+                   class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+              Giriş Yap
+            </button>
+          </div>
+        </form>
+        
+        <div class="mt-6 border-t border-gray-200 pt-4">
+          <p class="text-sm text-gray-500 text-center">
+            © 2023 Online Yoklama Sistemi
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const notyf = new Notyf({
+        duration: 3000,
+        position: {
+          x: 'right',
+          y: 'top',
+        }
+      });
+      
+      // Get user's location
+      let userLocation = null;
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            userLocation = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            };
+          },
+          (error) => {
+            console.error("Error getting location:", error);
+          }
+        );
+      }
+      
+      // Login form submission
+      const loginForm = document.getElementById('loginForm');
+      loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const tc = document.getElementById('tc').value;
+        const password = document.getElementById('password').value;
+        
+        try {
+          const response = await fetch('/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              tc,
+              password,
+              location: userLocation
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (response.ok) {
+            notyf.success('Giriş başarılı! Yönlendiriliyorsunuz...');
+            setTimeout(() => {
+              window.location.href = data.redirect;
+            }, 1000);
+          } else {
+            notyf.error(data.message || 'Giriş işlemi sırasında bir hata oluştu.');
+          }
+        } catch (error) {
+          console.error('Giriş hatası:', error);
+          notyf.error('Bir hata oluştu. Lütfen tekrar deneyin.');
+        }
+      });
+    });
+  </script>
+</body>
+</html>
