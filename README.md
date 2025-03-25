@@ -1,6 +1,7 @@
 # 📝 Online Yoklama Sistemi v1 
 
-![Online Yoklama Sistemi Banner](https://github.com/fastuptime/Online_Yoklama_Sistemi_V1/raw/main/banner.png)
+![image](https://github.com/user-attachments/assets/53b73ae9-7ee9-4fde-b54f-e1bd1d510bb3)
+
 
 > 🌍 Konum tabanlı, öğretim görevlileri ve öğrenciler için gerçek zamanlı online yoklama sistemi
 
@@ -98,16 +99,13 @@ npm start  # veya geliştirme için: npm run dev
 ## 📸 Ekran Görüntüleri
 
 ### Giriş Ekranı
-![Giriş Ekranı](https://github.com/fastuptime/Online_Yoklama_Sistemi_V1/raw/main/screenshots/login.png)
+![image](https://github.com/user-attachments/assets/be543861-cc9b-45f4-b452-324b6b42a469)
 
 ### Öğretim Görevlisi Paneli
-![Öğretim Görevlisi Paneli](https://github.com/fastuptime/Online_Yoklama_Sistemi_V1/raw/main/screenshots/instructor_dashboard.png)
+![Öğretim Görevlisi Paneli](https://github.com/user-attachments/assets/36fb603b-9d8a-4bd2-b642-b8b4b83afa5e)
 
 ### Öğrenci Paneli
-![Öğrenci Paneli](https://github.com/fastuptime/Online_Yoklama_Sistemi_V1/raw/main/screenshots/student_dashboard.png)
-
-### Aktif Yoklama
-![Aktif Yoklama](https://github.com/fastuptime/Online_Yoklama_Sistemi_V1/raw/main/screenshots/active_attendance.png)
+![Öğrenci Paneli](https://github.com/user-attachments/assets/a938d898-e303-4f83-802d-e319d2a12612)
 
 ## 🤝 Katkıda Bulunma
 
